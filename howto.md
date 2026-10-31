@@ -112,12 +112,36 @@ Execution Logic:
         - DepMat[I.DepTrBMID] : BitMask showing which instr depened on the instr with that DepTrBMID
 
         - Allocated a "LdDepTrkBM" 
+            - [What if] No More LdDepTrkBM
+                - Don't send Wait Tag Broadcast
+                - Since we can't track the younger dep instr
 
-        - Ok ... so all dependent instr needs to update THAT I.DepTrBMID
-        - Where can the depend instr be ? 
-            - IN IQ
-            - Not dispatched yet
-            - 
+        - Send Wait Tag Broadcast 
+            - Wait 
+            - I
+            - LdDepTrBM
+        
+Write back: 
+    - i.e instr is done 
+    - Send Wakeup tag
+    - MT[I.rd].valid = 1
+    - MT[I.rd].wait  = 0
+    
+    - If instr was Memory access:
+        - MT[I.rd].wait == 1 
+            - i.e this memory access was a miss before, and the "wait" tag was broadcasted for it
+            - i.e WIB needs to be told move these instr back
+
+            - Send the BitMask to WIB
+            - WIBSendBackBM = DepMat[MT[I.rd].DepTrBWID]
+            - WIBSendBackEn = MT[I.rd].wait  // if wait was 1 ... a "Wait" tag for this was broadcasted before
+            
+        - if it was a miss before ... will need to tell the WIB 
+            - How to find out ? 
+                - when the miss happend ... the MT[I.rd].wait would be set to 1 ! 
+                - We can use this as a check! 
+            
+        - If it wasn't a miss ... don't need to tell anyone  
 
 
     
