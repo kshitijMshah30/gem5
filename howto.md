@@ -18,15 +18,22 @@ Dispatch:
 
 Re-name:
     - I.src1, I.src2, I.rd
+    - I.src1.DepTrBMID, I.src2.DepTrBMID
 
     - FreeList          : list of free physical register that can be used
     - MT[I.src1].valid  : If the physical register that the logical reg maps to is ready [i.e we can read the reg file]
     - MT[I.src1].wait   : If the physical register that the logical reg maps to is "depnedent" on some long lat instr
-    - MT[I.src].PNR     : Physical Register Number of the logical register
+    - MT[I.src1].PNR     : Physical Register Number of the logical register
     - Read valid, wait, and PNR for src1 & src2
+
+    - MT[I.src1].DepTrBMID : Dependence Tracker Bit Mask ID
 
     - MT[I.rd].PNR = GetOne(FreeList)
     - MT[I.rd].valid = 0, MT[I.rd].PNR = 0
+
+    [::IMP::]
+    - IF the src of the instr are dependent .. tihs instr also must use the same ID
+    - MT[I.rd].DepTrBMID = MT[I.src1].wait ? MT[I.src1].DepTrBMID : (MT[I.src2].wait ? MT[I.src2].DepTrBMID : 0)
 
 Insert:
     - But the follwoing info into the IQ:
@@ -52,10 +59,12 @@ Wakeup:
     - For slot in IQ
         if (slot.src1.PNR == Tag.PNR)
             slot.src1.valid = Tag.type == WakeUp
-            slot.src.wait = Tag.type == Wait
+            slot.src1.wait = Tag.type == Wait
+            slot.src1.DepTRBMID = Tag.DepTRBMID  // ID allocated "OG" missing instr
         if (slot.src2.PNR == Tag.PNR)
             slot.src2.valid = Tag.type == WakeUp
-            slot.src.wait = Tag.type == Wait
+            slot.src2.wait = Tag.type == Wait
+            slot.src2.DepTRBMID = Tag.DepTRBMID // ID allocated "OG" missing instr
     - Free this instrs slot:
         - IQ[IQID].valid = Tag.type == WakeUp // Only valid on normal wakeup ... Wait tag ... cache miss!
 
@@ -79,18 +88,36 @@ Steering Logic:
         - Send to WIB
         - Send {Wait, I.rd} tag
         - WIB[I.WIBID] 
+        - Tag broadcat 
+            - Type : Wait
+            - Rd
+            - IQID
+            - I.src1.wait ? I.src1.DepTrBMID : I.src2.DepTrBMID 
+                - If we are waiting for dep instr ... dep instr on this instr should also update the same ID
+                - So, if wait is due to src1, use its else src2 
+                - What if Both are wait ? it fine ... if instr is put back in IQ when src1 is done, it will go back to WIB with src2.DepTrBMID
+            - DepMat [I.src1.wait ? I.src1.DepTrBMID : I.src2.DepTrBMID] [I.WIBID] = 1
+                - Mark itself dependent the "OG" instr
     - Else
         - Send to FU
 
 Execution Logic:
     - Not Memory Access ? 
-        - Execute Normally
+        - Execute Normally    - Each 
     - Memory Access ... ask cache 
         - Cache miss!
+
+        - Each missed loads get a "DepTrBMID" : Dependences Tracker Bit Mask ID
+        - DepMat : "N" vectors of len W
+        - DepMat[I.DepTrBMID] : BitMask showing which instr depened on the instr with that DepTrBMID
+
         - Allocated a "LdDepTrkBM" 
-            - BitMask of size W
-            - "1" => that ROB/WIBID instr depends on the load which has this vector
-        - 
+
+        - Ok ... so all dependent instr needs to update THAT I.DepTrBMID
+        - Where can the depend instr be ? 
+            - IN IQ
+            - Not dispatched yet
+            - 
 
 
     
