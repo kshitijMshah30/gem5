@@ -135,15 +135,36 @@ Write back:
             - Send the BitMask to WIB
             - WIBSendBackBM = DepMat[MT[I.rd].DepTrBWID]
             - WIBSendBackEn = MT[I.rd].wait  // if wait was 1 ... a "Wait" tag for this was broadcasted before
-            
-        - if it was a miss before ... will need to tell the WIB 
-            - How to find out ? 
-                - when the miss happend ... the MT[I.rd].wait would be set to 1 ! 
-                - We can use this as a check! 
-            
-        - If it wasn't a miss ... don't need to tell anyone  
+            - Free the DepTrBWID entry free
+        - MT[I.rd].wait == 0 
+            - No "Wait" tag for this was send
+            - No need to involve the WIB
 
-
+WIB:
+    - When a memory access results in a cache hit, WIB can send instrs back to IQ
+    - There is a fixed width to the channel 
+    - Simple "oldest" priority sending is fine
+    - Every resolved memory acess "OR" bits to the bits to send back
     
-        
+    - When an instr is picked to be sent back
+    - Allocated entry in IQ 
+        - No need to "re-name"
+        - Use the "wake-up" broadcast 
+            - All matching <Valid, Wait> : <0, 1> -> <1, 0> in IQ
+            - Same in Mapping table.
+
+Sticky Tricky: 
+
+Branches Mispredicts:
+    - Does the o3 pipes handel this ASAP ? 
+    - Key: End all instr younger than MIS-BR[ROBID] "<" I[ROBID]
+    
+    WIB:
+        - Only need to ensure the younger instr don't get sent back
+        - Take the MIS-BR[ROBID] and inv them in the "OR-ed" tracking vectors 
+        - So they are not sent back to IQ 
+    
+    DepTrBWIDs:
+        - Need to free all younger ids
+        - How know which all IDs to free ... 
         
